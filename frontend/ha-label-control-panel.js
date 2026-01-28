@@ -956,6 +956,7 @@ class HaLabelControlPanel extends LitElement {
       _labels: { type: Array },
       _labelEntities: { type: Object },
       _loading: { type: Boolean },
+      _loadError: { type: String },
     };
   }
 
@@ -968,6 +969,10 @@ class HaLabelControlPanel extends LitElement {
     this._labelEntities = {};
     this._loading = true;
     this._labelsLoading = false;
+    this._loadError = null;
+    // Memoization cache for domain counts
+    this._cachedDomainCounts = null;
+    this._lastHassStatesRef = null;
   }
 
   static get styles() {
@@ -1126,6 +1131,43 @@ class HaLabelControlPanel extends LitElement {
         color: var(--secondary-text-color);
         font-size: 14px;
       }
+
+      /* Error State */
+      .error-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 200px;
+        color: var(--error-color, #f44336);
+        text-align: center;
+        padding: 16px;
+      }
+
+      .error-icon {
+        margin-bottom: 12px;
+        --mdc-icon-size: 48px;
+      }
+
+      .error-message {
+        font-size: 14px;
+        margin-bottom: 16px;
+      }
+
+      .retry-button {
+        background: var(--primary-color);
+        color: var(--text-primary-color);
+        border: none;
+        border-radius: 8px;
+        padding: 8px 24px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      .retry-button:hover {
+        opacity: 0.9;
+      }
     `;
   }
 
@@ -1135,7 +1177,9 @@ class HaLabelControlPanel extends LitElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
+    // FIX: Set loading flag BEFORE async call to prevent race condition
     if (changedProperties.has("hass") && this.hass && this._labels.length === 0 && !this._labelsLoading) {
+      this._labelsLoading = true;  // Set flag immediately to prevent duplicate calls
       this._loadLabels();
     }
   }
@@ -1147,13 +1191,23 @@ class HaLabelControlPanel extends LitElement {
   }
 
   async _loadLabels() {
-    this._labelsLoading = true;
+    if (!this.hass) {
+      this._labelsLoading = false;
+      return;
+    }
     this._loading = true;
+    this._loadError = null;
     try {
       const result = await this.hass.callWS({
         type: "label_control/get_permitted_labels",
       });
-      this._labels = result.labels || [];
+
+      // Validate response format
+      if (!result || !Array.isArray(result.labels)) {
+        throw new Error("Invalid response format from server");
+      }
+
+      this._labels = result.labels;
 
       // Load all label entities in parallel for better performance
       const loadPromises = this._labels.map((label) =>
@@ -1165,6 +1219,7 @@ class HaLabelControlPanel extends LitElement {
       this.requestUpdate();
     } catch (error) {
       console.error("Failed to load labels:", error);
+      this._loadError = error.message || "Failed to load labels";
       this._labels = [];
     }
     this._loading = false;
@@ -1208,6 +1263,12 @@ class HaLabelControlPanel extends LitElement {
   }
 
   _getAllEntitiesByDomain() {
+    // Memoization: return cached value if hass.states hasn't changed
+    if (this._cachedDomainCounts && this._lastHassStatesRef === this.hass?.states) {
+      return this._cachedDomainCounts;
+    }
+    this._lastHassStatesRef = this.hass?.states;
+
     const domainEntities = {};
 
     for (const labelId of Object.keys(this._labelEntities)) {
@@ -1225,7 +1286,17 @@ class HaLabelControlPanel extends LitElement {
     for (const [domain, entitySet] of Object.entries(domainEntities)) {
       result[domain] = Array.from(entitySet);
     }
+    this._cachedDomainCounts = result;
     return result;
+  }
+
+  _handleRetry() {
+    this._labelsLoading = false;
+    this._labels = [];
+    this._labelEntities = {};
+    this._loadError = null;
+    this._labelsLoading = true;
+    this._loadLabels();
   }
 
   _handleLabelSelected(e) {
@@ -1292,6 +1363,18 @@ class HaLabelControlPanel extends LitElement {
     `;
   }
 
+  _renderError() {
+    return html`
+      <div class="error-container">
+        <ha-icon class="error-icon" icon="mdi:alert-circle"></ha-icon>
+        <div class="error-message">${this._loadError}</div>
+        <button class="retry-button" @click=${this._handleRetry}>
+          重試
+        </button>
+      </div>
+    `;
+  }
+
   _renderHomeView() {
     if (this._loading) {
       return html`
@@ -1300,6 +1383,10 @@ class HaLabelControlPanel extends LitElement {
           <span>${this._t("loading")}</span>
         </div>
       `;
+    }
+
+    if (this._loadError) {
+      return this._renderError();
     }
 
     const allEntitiesByDomain = this._getAllEntitiesByDomain();
