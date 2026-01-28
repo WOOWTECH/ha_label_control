@@ -1155,16 +1155,38 @@ class HaLabelControlPanel extends LitElement {
       });
       this._labels = result.labels || [];
 
-      // Load all label entities for summary
-      for (const label of this._labels) {
-        await this._loadLabelEntities(label.id);
-      }
+      // Load all label entities in parallel for better performance
+      const loadPromises = this._labels.map((label) =>
+        this._loadLabelEntitiesQuiet(label.id)
+      );
+      await Promise.all(loadPromises);
+
+      // Single requestUpdate after all data is loaded
+      this.requestUpdate();
     } catch (error) {
       console.error("Failed to load labels:", error);
       this._labels = [];
     }
     this._loading = false;
     this._labelsLoading = false;
+  }
+
+  // Silent version - doesn't trigger requestUpdate (for batch loading)
+  async _loadLabelEntitiesQuiet(labelId) {
+    if (this._labelEntities[labelId]) return;
+
+    try {
+      const result = await this.hass.callWS({
+        type: "label_control/get_label_entities",
+        label_id: labelId,
+      });
+      this._labelEntities = {
+        ...this._labelEntities,
+        [labelId]: result.entities || {},
+      };
+    } catch (error) {
+      console.error("Failed to load label entities:", error);
+    }
   }
 
   async _loadLabelEntities(labelId) {
