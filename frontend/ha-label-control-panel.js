@@ -785,7 +785,7 @@ class DomainSection extends LitElement {
       <div class="tiles-grid ${this.expanded ? "" : "collapsed"}">
         ${this.entities?.map(
           (entityId) => html`
-            <entity-tile .hass=${this.hass} entity-id=${entityId}></entity-tile>
+            <lc-entity-tile .hass=${this.hass} entity-id=${entityId}></lc-entity-tile>
           `
         )}
       </div>
@@ -931,7 +931,7 @@ class LabelSection extends LitElement {
       <div class="tiles-grid ${this.expanded ? "" : "collapsed"}">
         ${this.entities?.map(
           (entityId) => html`
-            <entity-tile .hass=${this.hass} entity-id=${entityId}></entity-tile>
+            <lc-entity-tile .hass=${this.hass} entity-id=${entityId}></lc-entity-tile>
           `
         )}
       </div>
@@ -1402,12 +1402,12 @@ class HaLabelControlPanel extends LitElement {
         <div class="summary-grid">
           ${summaryDomains.map(
             (domain) => html`
-              <summary-card
+              <lc-summary-card
                 .hass=${this.hass}
                 .domain=${domain}
                 .entities=${allEntitiesByDomain[domain] || []}
                 @domain-selected=${this._handleDomainSelected}
-              ></summary-card>
+              ></lc-summary-card>
             `
           )}
         </div>
@@ -1422,10 +1422,10 @@ class HaLabelControlPanel extends LitElement {
               <div class="labels-grid">
                 ${this._labels.map(
                   (label) => html`
-                    <label-card
+                    <lc-label-card
                       .label=${label}
                       @label-selected=${this._handleLabelSelected}
-                    ></label-card>
+                    ></lc-label-card>
                   `
                 )}
               </div>
