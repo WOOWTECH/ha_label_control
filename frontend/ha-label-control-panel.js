@@ -514,6 +514,16 @@ class SummaryCard extends LitElement {
       : "255, 255, 255";
   }
 
+  _handleClick() {
+    this.dispatchEvent(
+      new CustomEvent("domain-selected", {
+        bubbles: true,
+        composed: true,
+        detail: { domain: this.domain },
+      })
+    );
+  }
+
   render() {
     const icon = DOMAIN_ICONS[this.domain] || "mdi:help-circle";
     const color = DOMAIN_COLORS[this.domain] || "#9E9E9E";
@@ -523,6 +533,7 @@ class SummaryCard extends LitElement {
       <div
         class="summary-card ${this.isActive ? "active" : ""}"
         style="--tile-color: ${color}; --tile-color-bg: rgba(${colorRgb}, 0.2);"
+        @click=${this._handleClick}
       >
         <div class="summary-icon">
           <ha-icon icon=${icon}></ha-icon>
@@ -783,6 +794,152 @@ class DomainSection extends LitElement {
 customElements.define("domain-section", DomainSection);
 
 // ============================================================================
+// LABEL SECTION COMPONENT - For Domain Detail View (grouped by label)
+// ============================================================================
+
+class LabelSection extends LitElement {
+  static get properties() {
+    return {
+      hass: { type: Object },
+      label: { type: Object },
+      entities: { type: Array },
+      expanded: { type: Boolean },
+    };
+  }
+
+  constructor() {
+    super();
+    this.expanded = true;
+  }
+
+  static get styles() {
+    return css`
+      :host {
+        display: block;
+        margin-bottom: 16px;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        padding: 8px 4px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .section-header:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+      }
+
+      .section-icon {
+        width: 24px;
+        height: 24px;
+        margin-right: 8px;
+        color: var(--label-color, var(--secondary-text-color));
+      }
+
+      .section-icon ha-icon {
+        --mdc-icon-size: 20px;
+      }
+
+      .section-title {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--primary-text-color);
+      }
+
+      .section-count {
+        font-size: 12px;
+        color: var(--secondary-text-color);
+        margin-right: 8px;
+      }
+
+      .section-arrow {
+        color: var(--secondary-text-color);
+        transition: transform 0.2s ease;
+      }
+
+      .section-arrow.collapsed {
+        transform: rotate(-90deg);
+      }
+
+      .section-arrow ha-icon {
+        --mdc-icon-size: 20px;
+      }
+
+      .tiles-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding-top: 8px;
+      }
+
+      @media (min-width: 600px) {
+        .tiles-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .tiles-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      .tiles-grid.collapsed {
+        display: none;
+      }
+    `;
+  }
+
+  _hexToRgb(hex) {
+    if (!hex) return "33, 150, 243";
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+      : "33, 150, 243";
+  }
+
+  _getLabelColor(color) {
+    if (!color) return "#2196f3";
+    return LABEL_COLORS[color] || color;
+  }
+
+  _toggleExpanded() {
+    this.expanded = !this.expanded;
+  }
+
+  render() {
+    const icon = this.label?.icon || "mdi:label";
+    const color = this._getLabelColor(this.label?.color);
+
+    return html`
+      <div class="section-header" @click=${this._toggleExpanded} style="--label-color: ${color};">
+        <div class="section-icon">
+          <ha-icon icon=${icon}></ha-icon>
+        </div>
+        <div class="section-title">${this.label?.name || "Unknown"}</div>
+        <div class="section-count">${this.entities?.length || 0}</div>
+        <div class="section-arrow ${this.expanded ? "" : "collapsed"}">
+          <ha-icon icon="mdi:chevron-down"></ha-icon>
+        </div>
+      </div>
+      <div class="tiles-grid ${this.expanded ? "" : "collapsed"}">
+        ${this.entities?.map(
+          (entityId) => html`
+            <entity-tile .hass=${this.hass} entity-id=${entityId}></entity-tile>
+          `
+        )}
+      </div>
+    `;
+  }
+}
+
+customElements.define("label-section", LabelSection);
+
+// ============================================================================
 // MAIN PANEL COMPONENT
 // ============================================================================
 
@@ -795,6 +952,7 @@ class HaLabelControlPanel extends LitElement {
       // Internal state
       _view: { type: String },
       _selectedLabel: { type: Object },
+      _selectedDomain: { type: String },
       _labels: { type: Array },
       _labelEntities: { type: Object },
       _loading: { type: Boolean },
@@ -805,6 +963,7 @@ class HaLabelControlPanel extends LitElement {
     super();
     this._view = "home";
     this._selectedLabel = null;
+    this._selectedDomain = null;
     this._labels = [];
     this._labelEntities = {};
     this._loading = true;
@@ -1054,9 +1213,16 @@ class HaLabelControlPanel extends LitElement {
     this._loadLabelEntities(label.id);
   }
 
+  _handleDomainSelected(e) {
+    const domain = e.detail.domain;
+    this._selectedDomain = domain;
+    this._view = "domain";
+  }
+
   _handleBack() {
     this._view = "home";
     this._selectedLabel = null;
+    this._selectedDomain = null;
   }
 
   _toggleSidebar() {
@@ -1068,12 +1234,21 @@ class HaLabelControlPanel extends LitElement {
     );
   }
 
+  _getDomainLabel(domain) {
+    const lang = this.hass?.language || "en";
+    const names = DOMAIN_NAMES[lang] || DOMAIN_NAMES.en;
+    return names[domain] || domain;
+  }
+
   _renderHeader() {
     let title = this._t("title");
     let showBack = false;
 
     if (this._view === "label" && this._selectedLabel) {
       title = this._selectedLabel.name;
+      showBack = true;
+    } else if (this._view === "domain" && this._selectedDomain) {
+      title = this._getDomainLabel(this._selectedDomain);
       showBack = true;
     }
 
@@ -1120,6 +1295,7 @@ class HaLabelControlPanel extends LitElement {
                 .hass=${this.hass}
                 .domain=${domain}
                 .entities=${allEntitiesByDomain[domain] || []}
+                @domain-selected=${this._handleDomainSelected}
               ></summary-card>
             `
           )}
@@ -1175,12 +1351,55 @@ class HaLabelControlPanel extends LitElement {
     `;
   }
 
+  _renderDomainView() {
+    // Get entities by label for the selected domain
+    const domain = this._selectedDomain;
+    const labelEntitiesMap = [];
+
+    for (const label of this._labels) {
+      const labelData = this._labelEntities[label.id];
+      if (labelData && labelData[domain] && labelData[domain].length > 0) {
+        labelEntitiesMap.push({
+          label: label,
+          entities: labelData[domain],
+        });
+      }
+    }
+
+    if (labelEntitiesMap.length === 0) {
+      return html`<div class="empty">${this._t("noEntities")}</div>`;
+    }
+
+    return html`
+      ${labelEntitiesMap.map(
+        (item) => html`
+          <label-section
+            .hass=${this.hass}
+            .label=${item.label}
+            .entities=${item.entities}
+          ></label-section>
+        `
+      )}
+    `;
+  }
+
+  _renderContent() {
+    switch (this._view) {
+      case "label":
+        return this._renderLabelView();
+      case "domain":
+        return this._renderDomainView();
+      default:
+        return this._renderHomeView();
+    }
+  }
+
   render() {
     return html`
       <div class="panel-container">
         ${this._renderHeader()}
         <div class="content">
-          ${this._view === "home" ? this._renderHomeView() : this._renderLabelView()}
+          ${this._renderContent()}
         </div>
       </div>
     `;
