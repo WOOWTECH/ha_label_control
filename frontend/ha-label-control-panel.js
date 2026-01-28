@@ -394,7 +394,7 @@ class EntityTile extends LitElement {
   }
 }
 
-customElements.define("entity-tile", EntityTile);
+customElements.define("lc-entity-tile", EntityTile);
 
 // ============================================================================
 // SUMMARY CARD COMPONENT - Square Style (like Area Control)
@@ -547,7 +547,7 @@ class SummaryCard extends LitElement {
   }
 }
 
-customElements.define("summary-card", SummaryCard);
+customElements.define("lc-summary-card", SummaryCard);
 
 // ============================================================================
 // LABEL CARD COMPONENT - Square Style (like HA Home Areas)
@@ -662,7 +662,7 @@ class LabelCard extends LitElement {
   }
 }
 
-customElements.define("label-card", LabelCard);
+customElements.define("lc-label-card", LabelCard);
 
 // ============================================================================
 // DOMAIN SECTION COMPONENT
@@ -793,7 +793,7 @@ class DomainSection extends LitElement {
   }
 }
 
-customElements.define("domain-section", DomainSection);
+customElements.define("lc-domain-section", DomainSection);
 
 // ============================================================================
 // LABEL SECTION COMPONENT - For Domain Detail View (grouped by label)
@@ -939,7 +939,7 @@ class LabelSection extends LitElement {
   }
 }
 
-customElements.define("label-section", LabelSection);
+customElements.define("lc-label-section", LabelSection);
 
 // ============================================================================
 // MAIN PANEL COMPONENT
@@ -1452,11 +1452,11 @@ class HaLabelControlPanel extends LitElement {
     return html`
       ${domains.map(
         (domain) => html`
-          <domain-section
+          <lc-domain-section
             .hass=${this.hass}
             .domain=${domain}
             .entities=${entities[domain]}
-          ></domain-section>
+          ></lc-domain-section>
         `
       )}
     `;
@@ -1484,11 +1484,11 @@ class HaLabelControlPanel extends LitElement {
     return html`
       ${labelEntitiesMap.map(
         (item) => html`
-          <label-section
+          <lc-label-section
             .hass=${this.hass}
             .label=${item.label}
             .entities=${item.entities}
-          ></label-section>
+          ></lc-label-section>
         `
       )}
     `;
