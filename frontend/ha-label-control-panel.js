@@ -1,9 +1,11 @@
 // Home Assistant Native Style - Label Control Panel
 // Matches HA Home Dashboard design with summary cards and label tiles
 
-const { LitElement, html, css } = await import("/frontend_latest/frontend.js").catch(() => {
-  return import("https://unpkg.com/lit@2.8.0/index.js?module");
-});
+// Use jsDelivr CDN (faster than unpkg, with proper caching)
+// Direct import without fallback to avoid 404 delay
+const { LitElement, html, css } = await import(
+  "https://cdn.jsdelivr.net/npm/lit@3.1.0/+esm"
+);
 
 // ============================================================================
 // DESIGN TOKENS - HA Native Style
