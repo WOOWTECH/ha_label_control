@@ -66,18 +66,17 @@ const DOMAIN_ICONS = {
   remote: "mdi:remote",
 };
 
-// Domains that show in summary section
+// Fixed 9 domains that always show in summary section (same as Area Control)
 const SUMMARY_DOMAINS = [
-  "light",
-  "climate",
-  "cover",
-  "fan",
-  "media_player",
-  "lock",
-  "vacuum",
-  "switch",
-  "input_boolean",
-  "alarm_control_panel",
+  "light",           // 燈光
+  "climate",         // 溫控
+  "cover",           // 窗簾
+  "fan",             // 風扇
+  "media_player",    // 媒體播放器
+  "lock",            // 門鎖
+  "vacuum",          // 掃地機
+  "switch",          // 開關
+  "input_boolean",   // 輔助開關
 ];
 
 // Domains that can be toggled
@@ -396,7 +395,7 @@ class EntityTile extends LitElement {
 customElements.define("entity-tile", EntityTile);
 
 // ============================================================================
-// SUMMARY CARD COMPONENT - Horizontal Style (like HA Home)
+// SUMMARY CARD COMPONENT - Square Style (like Area Control)
 // ============================================================================
 
 class SummaryCard extends LitElement {
@@ -417,17 +416,23 @@ class SummaryCard extends LitElement {
       .summary-card {
         background: var(--card-background-color, rgba(255, 255, 255, 0.05));
         border-radius: 12px;
-        padding: 12px 16px;
+        padding: 16px;
         cursor: pointer;
-        transition: background 0.2s ease;
+        transition: background 0.2s ease, transform 0.1s ease;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 12px;
-        min-height: 48px;
+        text-align: center;
+        min-height: 100px;
+        justify-content: center;
       }
 
       .summary-card:hover {
         filter: brightness(1.1);
+      }
+
+      .summary-card:active {
+        transform: scale(0.98);
       }
 
       .summary-card.active {
@@ -435,15 +440,15 @@ class SummaryCard extends LitElement {
       }
 
       .summary-icon {
-        width: 40px;
-        height: 40px;
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         background: rgba(255, 255, 255, 0.1);
         color: var(--secondary-text-color);
-        flex-shrink: 0;
+        margin-bottom: 12px;
       }
 
       .summary-card.active .summary-icon {
@@ -452,24 +457,19 @@ class SummaryCard extends LitElement {
       }
 
       .summary-icon ha-icon {
-        --mdc-icon-size: 20px;
-      }
-
-      .summary-info {
-        flex: 1;
-        min-width: 0;
+        --mdc-icon-size: 24px;
       }
 
       .summary-label {
         font-size: 14px;
         font-weight: 500;
         color: var(--primary-text-color);
+        margin-bottom: 4px;
       }
 
       .summary-state {
         font-size: 12px;
         color: var(--secondary-text-color);
-        margin-top: 2px;
       }
 
       .summary-card.active .summary-state {
@@ -496,7 +496,7 @@ class SummaryCard extends LitElement {
     const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
     if (this.activeCount === 0) {
-      return t.allOff;
+      return `0 ${t.on}`;
     }
     return `${this.activeCount} ${t.on}`;
   }
@@ -527,10 +527,8 @@ class SummaryCard extends LitElement {
         <div class="summary-icon">
           <ha-icon icon=${icon}></ha-icon>
         </div>
-        <div class="summary-info">
-          <div class="summary-label">${this.domainLabel}</div>
-          <div class="summary-state">${this.stateText}</div>
-        </div>
+        <div class="summary-label">${this.domainLabel}</div>
+        <div class="summary-state">${this.stateText}</div>
       </div>
     `;
   }
@@ -912,16 +910,22 @@ class HaLabelControlPanel extends LitElement {
         margin-bottom: 12px;
       }
 
-      /* Summary grid - 2 columns horizontal cards */
+      /* Summary grid - 3 columns square cards (like Area Control) */
       .summary-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 8px;
       }
 
       @media (max-width: 599px) {
         .summary-grid {
-          grid-template-columns: 1fr;
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .summary-grid {
+          grid-template-columns: repeat(3, 1fr);
         }
       }
 
@@ -1102,28 +1106,25 @@ class HaLabelControlPanel extends LitElement {
     }
 
     const allEntitiesByDomain = this._getAllEntitiesByDomain();
-    const summaryDomains = SUMMARY_DOMAINS.filter((d) => allEntitiesByDomain[d]?.length > 0);
+    // Always show all 9 domains (like Area Control), even if no entities
+    const summaryDomains = SUMMARY_DOMAINS;
 
     return html`
-      <!-- Summary Section -->
-      ${summaryDomains.length > 0
-        ? html`
-            <div class="section">
-              <div class="section-label">${this._t("summary")}</div>
-              <div class="summary-grid">
-                ${summaryDomains.map(
-                  (domain) => html`
-                    <summary-card
-                      .hass=${this.hass}
-                      .domain=${domain}
-                      .entities=${allEntitiesByDomain[domain] || []}
-                    ></summary-card>
-                  `
-                )}
-              </div>
-            </div>
-          `
-        : ""}
+      <!-- Summary Section - Fixed 9 domain cards -->
+      <div class="section">
+        <div class="section-label">${this._t("summary")}</div>
+        <div class="summary-grid">
+          ${summaryDomains.map(
+            (domain) => html`
+              <summary-card
+                .hass=${this.hass}
+                .domain=${domain}
+                .entities=${allEntitiesByDomain[domain] || []}
+              ></summary-card>
+            `
+          )}
+        </div>
+      </div>
 
       <!-- Labels Section -->
       <div class="section">
