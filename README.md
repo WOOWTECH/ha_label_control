@@ -6,18 +6,28 @@
 
 A Home Assistant custom component that provides a sidebar panel for controlling entities organized by labels. Works with the [Permission Manager](https://github.com/WOOWTECH/ha_permission_manager) integration to show only the labels each user has permission to access.
 
+**Current Version: 2.3.0**
+
 ## Features
 
 - **Label-based Entity Control**: View and control entities grouped by their assigned labels
 - **Permission-aware**: Integrates with Permission Manager to show only permitted labels for each user
 - **Multi-language Support**: English, Traditional Chinese (zh-Hant), and Simplified Chinese (zh-Hans)
-- **Modern UI**: Clean, responsive interface following Home Assistant design guidelines
-- **Domain Grouping**: Entities are organized by domain (lights, switches, climate, etc.)
+- **Native HA Style UI**: Clean, responsive interface matching Home Assistant's modern design
+- **Domain Summary Dashboard**: 3x3 grid showing 9 domain categories (Lights, Climate, Covers, Fans, Media, Locks, Vacuums, Switches, Input Boolean)
+- **Domain Detail View**: Click domain summary cards to see entities grouped by labels
+- **Label Detail View**: Click label cards to see entities grouped by domain
+- **Interactive Entity Tiles**: Brightness sliders for lights, temperature controls for climate, cover buttons, and more
 - **Real-time Updates**: Entity states update in real-time
+- **Optimized Performance**: Parallel data loading for fast initial render
 
 ## Screenshots
 
-The panel displays labels as cards with entity counts. Click a label to see all entities with that label, organized by domain.
+The panel features three views:
+
+1. **Home View**: Summary section with 9 domain category cards + Label cards grid
+2. **Domain View**: Click a domain summary card to see all entities of that domain grouped by labels
+3. **Label View**: Click a label card to see all entities with that label, organized by domain
 
 ## Requirements
 
