@@ -6,7 +6,7 @@
 
 A Home Assistant custom component that provides a sidebar panel for controlling entities organized by labels. Works with the [Permission Manager](https://github.com/WOOWTECH/ha_permission_manager) integration to show only the labels each user has permission to access.
 
-**Current Version: 2.3.0**
+**Current Version: 2.0.0**
 
 ## Features
 
