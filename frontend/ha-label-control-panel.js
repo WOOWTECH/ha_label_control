@@ -119,6 +119,8 @@ const TRANSLATIONS = {
     on: "on",
     off: "off",
     allOff: "All off",
+    searchPlaceholder: "Search devices...",
+    all: "All",
   },
   "zh-Hant": {
     title: "標籤控制",
@@ -131,6 +133,8 @@ const TRANSLATIONS = {
     on: "開啟",
     off: "關閉",
     allOff: "全部關閉",
+    searchPlaceholder: "搜尋裝置...",
+    all: "全部",
   },
   "zh-Hans": {
     title: "标签控制",
@@ -143,6 +147,8 @@ const TRANSLATIONS = {
     on: "开启",
     off: "关闭",
     allOff: "全部关闭",
+    searchPlaceholder: "搜索设备...",
+    all: "全部",
   },
 };
 
@@ -959,6 +965,9 @@ class HaLabelControlPanel extends LitElement {
       _labelEntities: { type: Object },
       _loading: { type: Boolean },
       _loadError: { type: String },
+      // Search and filter state for label detail view
+      _searchQuery: { type: String },
+      _selectedDomainTab: { type: String },
     };
   }
 
@@ -975,6 +984,9 @@ class HaLabelControlPanel extends LitElement {
     // Memoization cache for domain counts
     this._cachedDomainCounts = null;
     this._lastHassStatesRef = null;
+    // Search and filter state
+    this._searchQuery = "";
+    this._selectedDomainTab = null;
   }
 
   static get styles() {
@@ -1170,6 +1182,94 @@ class HaLabelControlPanel extends LitElement {
       .retry-button:hover {
         opacity: 0.9;
       }
+
+      /* Search bar */
+      .search-container {
+        background: var(--card-background-color, rgba(255, 255, 255, 0.05));
+        border-radius: 28px;
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .search-icon {
+        color: var(--secondary-text-color);
+        flex-shrink: 0;
+      }
+
+      .search-icon ha-icon {
+        --mdc-icon-size: 20px;
+      }
+
+      .search-input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        color: var(--primary-text-color);
+        font-size: 16px;
+        outline: none;
+        min-width: 0;
+      }
+
+      .search-input::placeholder {
+        color: var(--secondary-text-color);
+      }
+
+      /* Domain tabs */
+      .domain-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+        margin-bottom: 16px;
+        scrollbar-width: none;
+      }
+
+      .domain-tabs::-webkit-scrollbar {
+        display: none;
+      }
+
+      .domain-tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        background: var(--card-background-color, rgba(255, 255, 255, 0.05));
+        cursor: pointer;
+        white-space: nowrap;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        transition: background 0.2s, filter 0.2s;
+        border: none;
+        flex-shrink: 0;
+      }
+
+      .domain-tab:hover {
+        filter: brightness(1.1);
+      }
+
+      .domain-tab.active {
+        background: var(--primary-color);
+        color: var(--text-primary-color, #fff);
+      }
+
+      .domain-tab ha-icon {
+        --mdc-icon-size: 18px;
+      }
+
+      .domain-tab-count {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+      }
+
+      .domain-tab.active .domain-tab-count {
+        background: rgba(255, 255, 255, 0.3);
+      }
     `;
   }
 
@@ -1305,6 +1405,9 @@ class HaLabelControlPanel extends LitElement {
     const label = e.detail.label;
     this._selectedLabel = label;
     this._view = "label";
+    // Reset search and filter state when entering label view
+    this._searchQuery = "";
+    this._selectedDomainTab = null;
     this._loadLabelEntities(label.id);
   }
 
@@ -1434,9 +1537,71 @@ class HaLabelControlPanel extends LitElement {
     `;
   }
 
-  _renderLabelView() {
-    const entities = this._labelEntities[this._selectedLabel?.id] || {};
-    const domains = Object.keys(entities).sort((a, b) => {
+  // Filter entities by search query
+  _filterEntitiesBySearch(entities) {
+    if (!this._searchQuery) return entities;
+
+    const query = this._searchQuery.toLowerCase();
+    const filtered = {};
+
+    for (const [domain, entityIds] of Object.entries(entities)) {
+      const matchingIds = entityIds.filter((id) => {
+        const entity = this.hass?.states?.[id];
+        const name = entity?.attributes?.friendly_name || id;
+        return name.toLowerCase().includes(query) || id.toLowerCase().includes(query);
+      });
+      if (matchingIds.length > 0) {
+        filtered[domain] = matchingIds;
+      }
+    }
+    return filtered;
+  }
+
+  // Handle search input
+  _handleSearchInput(e) {
+    this._searchQuery = e.target.value;
+  }
+
+  // Handle domain tab click
+  _handleDomainTabClick(domain) {
+    this._selectedDomainTab = domain;
+  }
+
+  // Get color helper
+  _hexToRgbPanel(hex) {
+    if (!hex) return "255, 179, 0";
+    if (hex.startsWith("rgb")) {
+      const match = hex.match(/\d+/g);
+      return match ? match.slice(0, 3).join(", ") : "255, 179, 0";
+    }
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+      : "255, 179, 0";
+  }
+
+  // Render search bar
+  _renderSearchBar() {
+    return html`
+      <div class="search-container">
+        <div class="search-icon">
+          <ha-icon icon="mdi:magnify"></ha-icon>
+        </div>
+        <input
+          type="text"
+          class="search-input"
+          placeholder=${this._t("searchPlaceholder")}
+          .value=${this._searchQuery}
+          @input=${this._handleSearchInput}
+        />
+      </div>
+    `;
+  }
+
+  // Render domain tabs
+  _renderDomainTabs(filteredEntities) {
+    // Get domains sorted by DOMAIN_ORDER
+    const domains = Object.keys(filteredEntities).sort((a, b) => {
       const indexA = DOMAIN_ORDER.indexOf(a);
       const indexB = DOMAIN_ORDER.indexOf(b);
       if (indexA === -1 && indexB === -1) return a.localeCompare(b);
@@ -1445,20 +1610,108 @@ class HaLabelControlPanel extends LitElement {
       return indexA - indexB;
     });
 
-    if (domains.length === 0) {
+    if (domains.length === 0) return html``;
+
+    // Calculate total count for "All" tab
+    const totalCount = Object.values(filteredEntities).reduce(
+      (sum, arr) => sum + arr.length,
+      0
+    );
+
+    // "All" tab color - use default yellow/amber
+    const allColor = "#FFB300";
+    const allColorRgb = this._hexToRgbPanel(allColor);
+
+    return html`
+      <div class="domain-tabs">
+        <!-- All tab -->
+        <button
+          class="domain-tab ${this._selectedDomainTab === null ? "active" : ""}"
+          style="--tab-color: ${allColor}; --tab-color-bg: rgba(${allColorRgb}, 0.3);"
+          @click=${() => this._handleDomainTabClick(null)}
+        >
+          <ha-icon icon="mdi:view-grid"></ha-icon>
+          <span>${this._t("all")}</span>
+          <span class="domain-tab-count">${totalCount}</span>
+        </button>
+
+        <!-- Domain tabs -->
+        ${domains.map((domain) => {
+          const color = DOMAIN_COLORS[domain] || "#9E9E9E";
+          const colorRgb = this._hexToRgbPanel(color);
+          const icon = DOMAIN_ICONS[domain] || "mdi:help-circle";
+          const count = filteredEntities[domain]?.length || 0;
+          const name = this._getDomainLabel(domain);
+
+          return html`
+            <button
+              class="domain-tab ${this._selectedDomainTab === domain ? "active" : ""}"
+              style="--tab-color: ${color}; --tab-color-bg: rgba(${colorRgb}, 0.3);"
+              @click=${() => this._handleDomainTabClick(domain)}
+            >
+              <ha-icon icon=${icon}></ha-icon>
+              <span>${name}</span>
+              <span class="domain-tab-count">${count}</span>
+            </button>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  _renderLabelView() {
+    const entities = this._labelEntities[this._selectedLabel?.id] || {};
+
+    // Filter by search query first
+    const filteredEntities = this._filterEntitiesBySearch(entities);
+
+    // Get domains for tabs (from filtered entities)
+    const domains = Object.keys(filteredEntities).sort((a, b) => {
+      const indexA = DOMAIN_ORDER.indexOf(a);
+      const indexB = DOMAIN_ORDER.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+
+    // Filter by selected domain tab
+    const displayEntities = this._selectedDomainTab
+      ? { [this._selectedDomainTab]: filteredEntities[this._selectedDomainTab] }
+      : filteredEntities;
+
+    // Get domains to display
+    const displayDomains = Object.keys(displayEntities).filter(
+      (d) => displayEntities[d] && displayEntities[d].length > 0
+    ).sort((a, b) => {
+      const indexA = DOMAIN_ORDER.indexOf(a);
+      const indexB = DOMAIN_ORDER.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+
+    // Check if original entities object is empty (no entities with this label at all)
+    const hasNoEntities = Object.keys(entities).length === 0;
+    if (hasNoEntities) {
       return html`<div class="empty">${this._t("noEntities")}</div>`;
     }
 
     return html`
-      ${domains.map(
-        (domain) => html`
-          <lc-domain-section
-            .hass=${this.hass}
-            .domain=${domain}
-            .entities=${entities[domain]}
-          ></lc-domain-section>
-        `
-      )}
+      ${this._renderSearchBar()}
+      ${this._renderDomainTabs(filteredEntities)}
+      ${displayDomains.length === 0
+        ? html`<div class="empty">${this._t("noEntities")}</div>`
+        : displayDomains.map(
+            (domain) => html`
+              <lc-domain-section
+                .hass=${this.hass}
+                .domain=${domain}
+                .entities=${displayEntities[domain]}
+              ></lc-domain-section>
+            `
+          )}
     `;
   }
 
