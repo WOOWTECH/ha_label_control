@@ -1,10 +1,9 @@
 // Home Assistant Native Style - Label Control Panel
 // Matches HA Home Dashboard design with summary cards and label tiles
 
-// Use jsDelivr CDN (faster than unpkg, with proper caching)
-// Direct import without fallback to avoid 404 delay
+// Local Lit bundle (no CDN dependency for offline/intranet environments)
 const { LitElement, html, css } = await import(
-  "https://cdn.jsdelivr.net/npm/lit@3.1.0/+esm"
+  "/ha_label_control/lit.js"
 );
 
 // ============================================================================
@@ -87,6 +86,8 @@ const TOGGLEABLE_DOMAINS = [
   "switch",
   "input_boolean",
   "fan",
+  "climate",
+  "humidifier",
   "automation",
   "lock",
   "vacuum",
@@ -984,6 +985,7 @@ class HaLabelControlPanel extends LitElement {
     // Memoization cache for domain counts
     this._cachedDomainCounts = null;
     this._lastHassStatesRef = null;
+    this._lastLabelEntitiesRef = null;
     // Search and filter state
     this._searchQuery = "";
     this._selectedDomainTab = null;
@@ -1365,11 +1367,16 @@ class HaLabelControlPanel extends LitElement {
   }
 
   _getAllEntitiesByDomain() {
-    // Memoization: return cached value if hass.states hasn't changed
-    if (this._cachedDomainCounts && this._lastHassStatesRef === this.hass?.states) {
+    // Memoization: return cached value if neither hass.states nor _labelEntities changed
+    if (
+      this._cachedDomainCounts &&
+      this._lastHassStatesRef === this.hass?.states &&
+      this._lastLabelEntitiesRef === this._labelEntities
+    ) {
       return this._cachedDomainCounts;
     }
     this._lastHassStatesRef = this.hass?.states;
+    this._lastLabelEntitiesRef = this._labelEntities;
 
     const domainEntities = {};
 
